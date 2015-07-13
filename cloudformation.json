@@ -149,6 +149,10 @@
       "Description": "RabbitMQ Sensu Password",
       "Type": "String"
     },
+    "GrafanaDBPassword": {
+      "Description": "Grafana Database Password",
+      "Type": "String"
+    },
     "RabbitMQStatsdPassword": {
       "Description": "RabbitMQ Statsd Password",
       "Type": "String"
@@ -302,6 +306,18 @@
               "Ref": "PrivateSubnet2"
             }
           },
+          "grafana": {
+              "webserver": "",
+              "ini": {
+                  "database" : {
+                      "type": "mysql",
+                      "host": { "Fn::GetAtt": ["GrafanaDB", "Endpoint.Address"]},
+                      "user": "grafanaroot",
+                      "password": {"Ref": "GrafanaDBPassword"}
+                  },
+                  "auth.anonymous" : true
+              }
+          },
           "instance_type": {
             "bastion" : {
               "Ref":"BastionInstanceType"
@@ -353,16 +369,14 @@
             }
           },
           "elasticsearch": {
-            "version": "1.0.1",
+            "version": "1.6",
             "cluster": {
               "name": "logstash"
             },
-            "plugins": {
-              "elasticsearch/elasticsearch-cloud-aws": {
-                "version": "2.2.0"
-              }
-            },
             "cloud": {
+                "node" : {
+                    "auto_attributes": true
+                },
               "aws": {
                 "region": {
                   "Ref": "AWS::Region"
@@ -375,7 +389,9 @@
             "http_auth": false,
             "index.number_of_shards": 8,
             "index.number_of_replicas": 2,
-            "index.auto_expand_replicas": "2-all"
+            "index.auto_expand_replicas": "2-all",
+            "discovery.ec2.ping_timeout": "30s",
+            "discovery.ec2.groups": { "Ref": "InternalSecurityGroup" }
           },
           "bb_monitor": {
             "sensu": {
@@ -1389,9 +1405,20 @@
             "LoadBalancerPort": "5671",
             "InstancePort": "5672",
             "Protocol": "SSL",
-            "SSLCertificateId": {
-              "Ref": "RabbitMQCertificateARN"
-            }
+            "SSLCertificateId" : {
+            "Fn::Join":[
+               "",
+               [
+                  "arn:aws:iam::",
+                  {
+                     "Ref":"AWS::AccountId"
+                  },
+                  ":server-certificate",
+                  "/",
+                  "opsviz"
+               ]
+            ]
+          }
           }
         ],
         "HealthCheck": {
@@ -1640,7 +1667,6 @@
         "VpcId": { "Ref": "VPC" }
       }
     },
-
     "RedisSecurityGroupIngressCluster": {
       "Type": "AWS::EC2::SecurityGroupIngress",
       "Properties": {
@@ -1660,6 +1686,36 @@
         "GroupId": { "Fn::GetAtt": ["RedisSecurityGroup", "GroupId"] },
         "SourceSecurityGroupId": { "Fn::GetAtt": ["OpsWorksSecurityGroup", "GroupId"] }
       }
+    },
+    "GrafanaDBSecurityGroup": {
+      "Type": "AWS::RDS::DBSecurityGroup",
+      "Properties": {
+        "DBSecurityGroupIngress": { "EC2SecurityGroupId": { "Ref": "OpsWorksSecurityGroup"} },
+        "GroupDescription"      : "Database Access",
+        "EC2VpcId": { "Ref": "VPC" }
+      }
+    },
+    "GrafanaDBSubnetGroup" : {
+         "Type" : "AWS::RDS::DBSubnetGroup",
+         "Properties" : {
+            "DBSubnetGroupDescription" : "GrafanaDB Subnet Group",
+            "SubnetIds": [ { "Ref": "PrivateSubnet0" }, { "Ref": "PrivateSubnet1" }, { "Ref": "PrivateSubnet2" } ]
+         }
+    },
+    "GrafanaDB" : {
+     "Type" : "AWS::RDS::DBInstance",
+     "DependsOn": "GrafanaDBSecurityGroup",
+     "Properties" : {
+         "DBSecurityGroups" : [ { "Ref": "GrafanaDBSecurityGroup" }],
+         "AllocatedStorage" : "5",
+         "DBInstanceClass" : "db.m1.small",
+         "DBSubnetGroupName"    : { "Ref" : "GrafanaDBSubnetGroup" },
+         "Engine" : "MySQL",
+         "MasterUsername" : "grafanaroot",
+         "MasterUserPassword" : {"Ref": "GrafanaDBPassword" },
+         "MultiAZ" : true
+     },
+     "DeletionPolicy" : "Snapshot"
     },
     "VPC": {
       "Type": "AWS::EC2::VPC",

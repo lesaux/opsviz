@@ -172,7 +172,7 @@ We use the public facing RabbitMQ as the transport layer for external sensu clie
 
 You will need to assign the proper S3 policy to your opsworks instance role.
 
-This works with the following attributes:
+This works with the following attributes in a custom json:
 ```
 normal[:remote_config_files][:logstash] = [
   [ "region_name", "bucket_name", "full_path_to_the_destination_file", "full_path_to_the_source_configuration_file" ],
@@ -181,18 +181,8 @@ normal[:remote_config_files][:logstash] = [
 ```
 
 ```
-normal[:remote_config_files][:logstash] = [
-  [ "us-east-1", "opsviz-remote_config_files", "/etc/logstash/conf.d/nginx_filters.conf", "logstash/nginx_filters.conf" ],
-  [ "us-east-1", "opsviz-remote_config_files", "/etc/logstash/conf.d/dmesg_filters.conf", "logstash/dmesg_filters.conf" ]
-]
-normal[:remote_config_files][:sensu] = [
-  [ "us-east-1", "opsviz-remote_config_files", "/etc/sensu/conf.d/checks/custom_checks.json", "sensu/custom_checks.json" ],
-  [ "us-east-1", "opsviz-remote_config_files", "/etc/sensu/conf.d/plugins/my-check-script.sh", "sensu/my-check-script.sh" ]
-]
+"remote_config_files": {"logstash": [ [ "us-east-1", "mybucket", "/etc/logstash/conf.d/mysql-slow-queries-filter.conf", "logstash-configs/mysql-slow-queries-filter.conf" ] ] }
 ```
-
-
-
 
 
 - Handlers
